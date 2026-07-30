@@ -14,14 +14,14 @@ Built by a 13-year-old founder with Claude Code, on a $0 budget. Runs great on f
 
 **Windows**
 ```bash
-git clone https://github.com/Dynamox-DEV677/koda.git
+git clone https://github.com/Dynamox-DEV677/KODA--your-claude-alternative.git koda
 cd koda
 .\koda.bat
 ```
 
 **macOS / Linux**
 ```bash
-git clone https://github.com/Dynamox-DEV677/koda.git
+git clone https://github.com/Dynamox-DEV677/KODA--your-claude-alternative.git koda
 cd koda
 node src/index.js
 ```
