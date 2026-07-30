@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timer</title>
+<style>
+  :root {
+    --bg: #000000;
+    --label: rgba(255, 255, 255, 0.92);
+    --label-2: rgba(235, 235, 245, 0.6);
+    --label-3: rgba(235, 235, 245, 0.3);
+    --fill: rgba(120, 120, 128, 0.2);
+    --fill-2: rgba(120, 120, 128, 0.32);
+    --separator: rgba(84, 84, 88, 0.6);
+    --orange: #ff9f0a;
+    --green: #30d158;
+    --gray-btn: rgba(255, 255, 255, 0.12);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI Variable Display', 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--label);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    user-select: none;
+    overflow: hidden;
+  }
+  /* faint atmosphere so pure black doesn't feel flat */
+  .glow {
+    position: fixed;
+    width: 70vmax; height: 70vmax;
+    left: 50%; top: 42%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255, 159, 10, 0.05) 0%, transparent 60%);
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+    opacity: 0;
+  }
+  body.running .glow { opacity: 1; }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 34px;
+    padding: 32px 20px;
+    width: min(420px, 100%);
+  }
+
+  .title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--label-3);
+  }
+
+  /* ─── Ring + digits ─── */
+  .ring-wrap { position: relative; width: 300px; height: 300px; }
+  .ring-wrap svg { transform: rotate(-90deg); display: block; }
+  .track { stroke: rgba(255, 255, 255, 0.07); }
+  .progress {
+    stroke: var(--orange);
+    transition: stroke 0.5s ease;
+    filter: drop-shadow(0 0 6px rgba(255, 159, 10, 0.35));
+  }
+  body.paused .progress { stroke: rgba(255, 159, 10, 0.45); filter: none; }
+  body.done .progress { stroke: var(--green); filter: drop-shadow(0 0 8px rgba(48, 209, 88, 0.45)); }
+
+  .readout {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 6px;
+  }
+  .time {
+    font-size: 64px;
+    font-weight: 200;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--label);
+    transition: color 0.4s ease;
+  }
+  body.done .time { animation: donePulse 1s ease infinite alternate; }
+  @keyframes donePulse { from { opacity: 1; } to { opacity: 0.35; } }
+  .state {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--label-3);
+    text-transform: uppercase;
+    transition: color 0.4s ease;
+  }
+  body.running .state { color: var(--orange); }
+  body.done .state { color: var(--green); }
+
+  /* ─── Segmented control (presets) ─── */
+  .segments {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    background: var(--fill);
+    border-radius: 10px;
+    padding: 2px;
+    width: 100%;
+  }
+  .thumb {
+    position: absolute;
+    top: 2px; bottom: 2px;
+    width: calc((100% - 4px) / 6);
+    background: rgba(99, 99, 102, 0.85);
+    border-radius: 8px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(255,255,255,0.04);
+    transition: transform 0.35s var(--ease);
+  }
+  .segments button {
+    position: relative;
+    background: none; border: 0;
+    padding: 8px 0;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--label-2);
+    cursor: pointer;
+    transition: color 0.25s ease;
+    z-index: 1;
+  }
+  .segments button.active { color: var(--label); }
+  .segments button:active { opacity: 0.6; }
+
+  /* ─── Custom stepper ─── */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    color: var(--label-2);
+    font-size: 15px;
+  }
+  .stepper button {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--gray-btn);
+    color: var(--label);
+    font-size: 19px;
+    font-weight: 400;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.15s var(--ease), background 0.2s ease;
+  }
+  .stepper button:hover { background: var(--fill-2); }
+  .stepper button:active { transform: scale(0.88); }
+  .stepper .value { min-width: 72px; text-align: center; font-variant-numeric: tabular-nums; }
+  .stepper .value b { color: var(--label); font-weight: 600; }
+
+  /* ─── Action buttons (iOS Clock style) ─── */
+  .actions {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 10px;
+  }
+  .round {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    border: 0;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.15s var(--ease), opacity 0.2s ease;
+  }
+  .round::after { /* inner ring, like iOS */
+    content: '';
+    position: absolute; inset: 2px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg);
+  }
+  .round:active { transform: scale(0.92); }
+  .round:disabled { opacity: 0.35; cursor: default; }
+  .round.cancel { background: var(--gray-btn); color: var(--label); }
+  .round.start { background: rgba(48, 209, 88, 0.18); color: var(--green); }
+  .round.pause { background: rgba(255, 159, 10, 0.18); color: var(--orange); }
+
+  .hint {
+    font-size: 12px;
+    color: var(--label-3);
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 400px) {
+    .ring-wrap { width: 250px; height: 250px; }
+    .ring-wrap svg { width: 250px; height: 250px; }
+    .time { font-size: 52px; }
+    .round { width: 74px; height: 74px; font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+
+<main class="app">
+  <div class="title">Timer</div>
+
+  <div class="ring-wrap">
+    <svg width="300" height="300" viewBox="0 0 300 300" aria-hidden="true">
+      <circle class="track" cx="150" cy="150" r="141" fill="none" stroke-width="7"/>
+      <circle class="progress" id="progress" cx="150" cy="150" r="141" fill="none"
+              stroke-width="7" stroke-linecap="round"
+              stroke-dasharray="885.9" stroke-dashoffset="0"/>
+    </svg>
+    <div class="readout">
+      <div class="time" id="time">01:00</div>
+      <div class="state" id="state">Ready</div>
+    </div>
+  </div>
+
+  <div class="segments" id="segments">
+    <div class="thumb" id="thumb"></div>
+    <button data-min="1" class="active">1m</button>
+    <button data-min="5">5m</button>
+    <button data-min="10">10m</button>
+    <button data-min="15">15m</button>
+    <button data-min="30">30m</button>
+    <button data-min="60">60m</button>
+  </div>
+
+  <div class="stepper">
+    <button id="minus" aria-label="minus one minute">−</button>
+    <div class="value"><b id="customMin">1</b> min</div>
+    <button id="plus" aria-label="plus one minute">+</button>
+  </div>
+
+  <div class="actions">
+    <button class="round cancel" id="cancelBtn" disabled>Cancel</button>
+    <button class="round start" id="mainBtn">Start</button>
+  </div>
+
+  <div class="hint">Space to start · R to reset</div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  const CIRC = 885.9; // 2πr, r=141
+  const $ = (id) => document.getElementById(id);
+  const timeEl = $('time'), stateEl = $('state'), progressEl = $('progress');
+  const mainBtn = $('mainBtn'), cancelBtn = $('cancelBtn');
+  const segments = $('segments'), thumb = $('thumb'), customEl = $('customMin');
+
+  let totalMs = (parseInt(localStorage.getItem('timer.min'), 10) || 1) * 60000;
+  let remainMs = totalMs;
+  let endAt = 0;       // wall-clock end timestamp while running
+  let phase = 'idle';  // idle | running | paused | done
+  let ticker = 0;      // setInterval keeps ticking in background tabs (rAF freezes)
+
+  // ─── audio: soft two-tone chime, no files ───
+  let actx = null;
+  function chime() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      [[880, 0], [660, 0.18], [880, 0.36]].forEach(([f, at]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, actx.currentTime + at);
+        g.gain.exponentialRampToValueAtTime(0.12, actx.currentTime + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + at + 0.5);
+        o.connect(g).connect(actx.destination);
+        o.start(actx.currentTime + at); o.stop(actx.currentTime + at + 0.55);
+      });
+    } catch (e) { /* audio blocked — fine */ }
+  }
+
+  function fmt(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60);
+    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function paint() {
+    timeEl.textContent = fmt(remainMs);
+    progressEl.style.strokeDashoffset = (CIRC * (1 - remainMs / totalMs)).toFixed(1);
+    document.title = phase === 'running' ? fmt(remainMs) + ' — Timer' : 'Timer';
+  }
+
+  function setPhase(p) {
+    phase = p;
+    document.body.className = p === 'idle' ? '' : p;
+    stateEl.textContent = { idle: 'Ready', running: 'Running', paused: 'Paused', done: "Time's up" }[p];
+    mainBtn.textContent = p === 'running' ? 'Pause' : (p === 'paused' ? 'Resume' : 'Start');
+    mainBtn.classList.toggle('pause', p === 'running');
+    mainBtn.classList.toggle('start', p !== 'running');
+    cancelBtn.disabled = p === 'idle';
+  }
+
+  function tick() {
+    remainMs = endAt - Date.now();
+    if (remainMs <= 0) {
+      remainMs = 0;
+      clearInterval(ticker);
+      paint();
+      setPhase('done');
+      chime();
+      return;
+    }
+    paint();
+  }
+
+  function start() {
+    if (phase === 'done' || remainMs <= 0) remainMs = totalMs;
+    endAt = Date.now() + remainMs;
+    setPhase('running');
+    clearInterval(ticker);
+    ticker = setInterval(tick, 200);
+    tick();
+  }
+
+  function pause() {
+    clearInterval(ticker);
+    remainMs = Math.max(0, endAt - Date.now());
+    setPhase('paused');
+    paint();
+  }
+
+  function reset() {
+    clearInterval(ticker);
+    remainMs = totalMs;
+    setPhase('idle');
+    paint();
+  }
+
+  function setMinutes(min) {
+    min = Math.min(999, Math.max(1, min));
+    totalMs = min * 60000;
+    customEl.textContent = min;
+    localStorage.setItem('timer.min', min);
+    // sync segmented control highlight
+    const btns = [...segments.querySelectorAll('button')];
+    const idx = btns.findIndex((b) => +b.dataset.min === min);
+    btns.forEach((b, i) => b.classList.toggle('active', i === idx));
+    thumb.style.opacity = idx < 0 ? '0' : '1';
+    if (idx >= 0) thumb.style.transform = 'translateX(' + (idx * 100) + '%)';
+    reset();
+  }
+
+  // ─── events ───
+  mainBtn.addEventListener('click', () => (phase === 'running' ? pause() : start()));
+  cancelBtn.addEventListener('click', reset);
+  segments.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-min]');
+    if (b) setMinutes(+b.dataset.min);
+  });
+  $('plus').addEventListener('click', () => setMinutes(Math.round(totalMs / 60000) + 1));
+  $('minus').addEventListener('click', () => setMinutes(Math.round(totalMs / 60000) - 1));
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); phase === 'running' ? pause() : start(); }
+    if (e.key.toLowerCase() === 'r') reset();
+  });
+
+  setMinutes(Math.round(totalMs / 60000));
+})();
+</script>
+</body>
+</html>

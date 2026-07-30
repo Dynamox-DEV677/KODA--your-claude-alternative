@@ -1,0 +1,23 @@
+{
+  "provider": "nvidia",
+  "providers": {
+    "nvidia":     { "baseUrl": "https://integrate.api.nvidia.com/v1", "envKey": "NVIDIA_API_KEY" },
+    "groq":       { "baseUrl": "https://api.groq.com/openai/v1",      "envKey": "GROQ_API_KEY" },
+    "openrouter": { "baseUrl": "https://openrouter.ai/api/v1",        "envKey": "OPENROUTER_API_KEY" },
+    "together":   { "baseUrl": "https://api.together.xyz/v1",         "envKey": "TOGETHER_API_KEY" },
+    "openai":     { "baseUrl": "https://api.openai.com/v1",           "envKey": "OPENAI_API_KEY" },
+    "ollama":     { "baseUrl": "http://localhost:11434/v1",           "envKey": null }
+  },
+  "routes": {
+    "default":   "deepseek-ai/deepseek-v4-flash",
+    "fast":      "meta/llama-3.1-8b-instruct",
+    "coding":    "deepseek-ai/deepseek-v4-flash",
+    "reasoning": "nvidia/nemotron-3-nano-30b-a3b",
+    "review":    "deepseek-ai/deepseek-v4-flash"
+  },
+  "fallbacks": ["nvidia/nemotron-3-nano-30b-a3b", "meta/llama-3.1-8b-instruct"],
+  "persona": "",
+  "temperature": 0.6,
+  "maxTokens": 8192,
+  "maxToolSteps": 40
+}

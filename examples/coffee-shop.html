@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ember & Oak — Slow coffee. No shortcuts.</title>
+<style>
+:root {
+  --bg: #000;
+  --surface: rgba(255,255,255,0.04);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(235,235,245,0.6);
+  --tertiary: rgba(235,235,245,0.3);
+  --fill: rgba(120,120,128,0.2);
+  --accent: #ff9f0a;
+  --accent-glow: rgba(255,159,10,0.15);
+  --border: rgba(255,255,255,0.08);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  --max-w: 1100px;
+  --radius: 18px;
+  --transition: 0.3s cubic-bezier(0.32,0.72,0,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* atmosphere blobs */
+.atmo{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;overflow:hidden;
+}
+.atmo span{
+  position:absolute;
+  width:60vw;height:60vw;
+  border-radius:50%;
+  filter:blur(120px);
+  opacity:0.08;
+}
+.atmo .b1{background:var(--accent);top:-20%;left:-10%}
+.atmo .b2{background:var(--accent);bottom:-30%;right:-10%}
+
+/* nav */
+nav{
+  position:fixed;top:0;left:0;width:100%;z-index:100;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  background:rgba(10,10,15,0.72);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  transition:var(--transition);
+}
+nav.scrolled{background:rgba(10,10,15,0.92)}
+.nav-inner{
+  max-width:var(--max-w);margin:0 auto;
+  display:flex;align-items:center;justify-content:space-between;
+  height:64px;
+}
+.logo{
+  font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;
+  color:var(--text);
+}
+.logo em{font-style:normal;color:var(--accent)}
+.nav-links{display:flex;gap:32px;list-style:none}
+.nav-links a{
+  color:var(--muted);text-decoration:none;font-size:0.9rem;font-weight:500;
+  transition:color 0.3s;position:relative;
+}
+.nav-links a::after{
+  content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;
+  background:var(--accent);transition:width 0.3s;
+}
+.nav-links a:hover{color:var(--text)}
+.nav-links a:hover::after{width:100%}
+.nav-toggle{display:none;background:none;border:none;color:var(--text);font-size:1.5rem;cursor:pointer}
+
+/* sections */
+section{position:relative;z-index:1;padding:120px 24px}
+.section-inner{max-width:var(--max-w);margin:0 auto}
+
+/* hero */
+.hero{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:120px 24px 80px;
+}
+.hero-content{max-width:800px}
+.badge{
+  display:inline-block;padding:6px 16px;border-radius:100px;
+  background:var(--accent-glow);color:var(--accent);font-size:0.8rem;
+  font-weight:500;letter-spacing:0.06em;text-transform:uppercase;
+  margin-bottom:24px;border:1px solid rgba(217,119,6,0.2);
+}
+.hero h1{
+  font-size:clamp(2.8rem,7vw,5.5rem);font-weight:700;
+  letter-spacing:-0.03em;line-height:1.05;margin-bottom:20px;
+}
+.hero h1 .gradient{
+  background:linear-gradient(135deg,#fff,var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.hero p{
+  font-size:1.15rem;color:var(--muted);max-width:520px;margin:0 auto 40px;
+}
+.cta-group{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.cta{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:14px 32px;border-radius:12px;font-size:1rem;font-weight:500;
+  text-decoration:none;cursor:pointer;border:none;
+  transition:all 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.cta-primary{
+  background:var(--accent);color:#fff;
+}
+.cta-primary:hover{
+  filter:brightness(1.15);transform:translateY(-2px);
+  box-shadow:0 8px 32px rgba(217,119,6,0.3);
+}
+.cta-secondary{
+  background:transparent;color:var(--text);border:1px solid var(--border);
+}
+.cta-secondary:hover{
+  border-color:var(--accent);color:var(--accent);transform:translateY(-2px);
+}
+
+/* marquee */
+.marquee-section{padding:40px 0;overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.marquee-track{
+  display:flex;gap:48px;white-space:nowrap;
+  animation:marquee 30s linear infinite;
+}
+.marquee-track span{color:var(--muted);font-size:0.9rem;letter-spacing:0.04em}
+.marquee-track span::before{content:'✦';color:var(--accent);margin-right:12px;opacity:0.5}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* section headers */
+.section-label{
+  font-size:0.8rem;text-transform:uppercase;letter-spacing:0.12em;
+  color:var(--accent);font-weight:500;margin-bottom:12px;
+}
+.section-title{
+  font-size:clamp(1.8rem,4vw,3rem);font-weight:700;
+  letter-spacing:-0.02em;margin-bottom:16px;
+}
+.section-sub{color:var(--muted);max-width:600px;font-size:1.06rem}
+
+/* craft cards */
+.craft-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;margin-top:48px}
+.craft-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:40px 32px;
+  transition:all var(--transition);cursor:default;
+}
+.craft-card:hover{
+  transform:translateY(-6px);border-color:rgba(217,119,6,0.3);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+.craft-icon{font-size:2.4rem;margin-bottom:16px;display:block}
+.craft-card h3{font-size:1.3rem;font-weight:700;margin-bottom:8px}
+.craft-card p{color:var(--muted);font-size:0.95rem;line-height:1.7}
+
+/* menu */
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-top:48px}
+.menu-item{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:24px 0;border-bottom:1px solid var(--border);
+  transition:all 0.3s;
+}
+.menu-item:hover{padding-left:12px;border-bottom-color:rgba(217,119,6,0.3)}
+.menu-item:last-child{border-bottom:none}
+.menu-info h4{font-size:1.05rem;font-weight:500;margin-bottom:4px}
+.menu-info p{color:var(--muted);font-size:0.88rem;line-height:1.5}
+.menu-price{font-size:1.05rem;font-weight:500;color:var(--accent);white-space:nowrap;margin-left:16px}
+
+/* story */
+.story-layout{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;margin-top:48px}
+.story-text{font-size:1.06rem;color:var(--muted);line-height:1.9}
+.story-text p+p{margin-top:20px}
+.story-text .pull-quote{
+  font-size:1.4rem;color:var(--text);font-weight:500;
+  border-left:3px solid var(--accent);padding-left:24px;margin:32px 0;
+  line-height:1.5;letter-spacing:-0.01em;
+}
+.story-image{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);aspect-ratio:4/3;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:0.9rem;
+  background:radial-gradient(ellipse at center,rgba(217,119,6,0.06),transparent);
+  position:relative;overflow:hidden;
+}
+.story-image::before{
+  content:'✦';font-size:3rem;color:var(--accent);opacity:0.3;
+}
+
+/* visit */
+.visit-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:48px}
+.visit-info{display:flex;flex-direction:column;gap:28px}
+.visit-block{}
+.visit-block h4{font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:6px}
+.visit-block p{font-size:1.05rem;color:var(--muted);line-height:1.6}
+.visit-map{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);aspect-ratio:16/9;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;color:var(--muted);font-size:0.9rem;
+  background:radial-gradient(ellipse at 40% 50%,rgba(217,119,6,0.06),transparent);
+  position:relative;
+}
+.visit-map .map-pin{font-size:2rem;margin-bottom:4px}
+.visit-map .map-label{color:var(--accent);font-weight:500}
+
+/* final cta */
+.final-cta{
+  text-align:center;padding:140px 24px;
+  background:radial-gradient(ellipse at center,rgba(217,119,6,0.06),transparent);
+}
+.final-cta h2{font-size:clamp(2rem,5vw,3.5rem);font-weight:700;letter-spacing:-0.02em;margin-bottom:16px}
+.final-cta p{color:var(--muted);max-width:480px;margin:0 auto 36px;font-size:1.06rem}
+
+/* footer */
+footer{
+  position:relative;z-index:1;padding:48px 24px 32px;
+  border-top:1px solid var(--border);
+}
+.footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+footer .logo{font-size:1rem}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--muted);text-decoration:none;font-size:0.85rem;transition:color 0.3s}
+.footer-links a:hover{color:var(--text)}
+.footer-copy{color:var(--muted);font-size:0.82rem;width:100%;text-align:center;margin-top:16px}
+
+/* scroll reveal */
+.reveal{opacity:0;transform:translateY(24px);transition:all 0.7s cubic-bezier(0.22,1,0.36,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-delay-1{transition-delay:0.1s}
+.reveal-delay-2{transition-delay:0.2s}
+.reveal-delay-3{transition-delay:0.3s}
+.reveal-delay-4{transition-delay:0.4s}
+
+/* ─── booking modal ─── */
+.bk-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity 0.3s cubic-bezier(0.32,0.72,0,1)}
+.bk-overlay.open{opacity:1;pointer-events:auto}
+.bk-modal{background:rgba(20,20,28,0.92);border:1px solid var(--border);border-radius:20px;width:min(460px,100%);max-height:min(86vh,720px);overflow-y:auto;padding:28px;transform:scale(0.94) translateY(12px);transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);box-shadow:0 40px 90px rgba(0,0,0,0.6)}
+.bk-overlay.open .bk-modal{transform:scale(1) translateY(0)}
+.bk-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.bk-head h3{font-size:1.25rem;font-weight:600}
+.bk-close{background:var(--surface);border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:15px;line-height:1;transition:all 0.2s}
+.bk-close:hover{color:var(--text);border-color:var(--accent)}
+.bk-steps{display:flex;gap:6px;margin-bottom:22px}
+.bk-steps span{height:3px;flex:1;border-radius:2px;background:var(--border);transition:background 0.3s}
+.bk-steps span.on{background:var(--accent)}
+.bk-field{margin-bottom:16px}
+.bk-field label{display:block;font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.bk-field input,.bk-field textarea{width:100%;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font:inherit;font-size:0.95rem;transition:border-color 0.2s;outline:none}
+.bk-field input:focus,.bk-field textarea:focus{border-color:var(--accent)}
+.bk-field.invalid input,.bk-field.invalid textarea{border-color:#ef4444}
+.bk-err{display:none;font-size:0.78rem;color:#ef4444;margin-top:5px}
+.bk-field.invalid .bk-err{display:block}
+.bk-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bk-slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bk-slots button{padding:8px 4px;font-size:0.8rem;font-weight:500;background:var(--surface);border:1px solid var(--border);border-radius:999px;color:var(--text);cursor:pointer;transition:all 0.15s;font-family:inherit}
+.bk-slots button:hover:not(:disabled){border-color:var(--accent)}
+.bk-slots button.sel{background:var(--accent);border-color:var(--accent);color:#0a0a0f;font-weight:600}
+.bk-slots button:disabled{opacity:0.25;cursor:default}
+.bk-stepper{display:flex;align-items:center;gap:18px}
+.bk-stepper button{width:36px;height:36px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;transition:all 0.15s;line-height:1}
+.bk-stepper button:hover{border-color:var(--accent)}
+.bk-stepper button:active{transform:scale(0.9)}
+.bk-stepper b{font-size:1.1rem;min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
+.bk-count{font-size:0.72rem;color:var(--muted);text-align:right;margin-top:4px}
+.bk-actions{display:flex;gap:12px;margin-top:22px}
+.bk-btn{flex:1;padding:13px;border-radius:999px;font:inherit;font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.2s;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.bk-btn.primary{background:var(--accent);border-color:var(--accent);color:#0a0a0f}
+.bk-btn.primary:hover:not(:disabled){filter:brightness(1.12);transform:translateY(-1px)}
+.bk-btn:disabled{opacity:0.4;cursor:default}
+.bk-shake{animation:bkshake 0.4s}
+@keyframes bkshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.bk-review{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:6px}
+.bk-review div{display:flex;justify-content:space-between;padding:7px 0;font-size:0.92rem;border-bottom:1px solid var(--border)}
+.bk-review div:last-child{border-bottom:0}
+.bk-review span{color:var(--muted)}
+.bk-edit{display:inline-block;margin:10px 0 0;font-size:0.85rem;color:var(--accent);cursor:pointer;background:none;border:none;font-family:inherit;padding:0}
+.bk-success{text-align:center;padding:10px 0}
+.bk-check{width:72px;height:72px;margin:6px auto 16px;display:block}
+.bk-check circle{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:214;stroke-dashoffset:214;animation:bkdraw 0.6s cubic-bezier(0.32,0.72,0,1) forwards}
+.bk-check path{stroke:var(--accent);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:bkdraw 0.45s 0.45s cubic-bezier(0.32,0.72,0,1) forwards}
+@keyframes bkdraw{to{stroke-dashoffset:0}}
+.bk-ref{font-size:1.7rem;font-weight:700;letter-spacing:0.08em;margin:6px 0 2px;color:var(--text)}
+.bk-sub{color:var(--muted);font-size:0.9rem;margin-bottom:18px}
+/* my bookings */
+.bk-list{display:flex;flex-direction:column;gap:12px}
+.bk-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.bk-card .meta{font-size:0.9rem}
+.bk-card .meta b{letter-spacing:0.05em}
+.bk-card .meta p{color:var(--muted);font-size:0.82rem;margin-top:3px}
+.bk-cancel{background:none;border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:7px 14px;font-size:0.8rem;cursor:pointer;font-family:inherit;transition:all 0.2s;white-space:nowrap}
+.bk-cancel.arm{background:#ef4444;border-color:#ef4444;color:#fff}
+.bk-empty{text-align:center;color:var(--muted);padding:26px 0;font-size:0.95rem}
+body.bk-lock{overflow:hidden}
+@media(max-width:640px){
+  .bk-overlay{align-items:flex-end;padding:0}
+  .bk-modal{border-radius:20px 20px 0 0;width:100%;max-height:92vh;transform:translateY(100%)}
+  .bk-overlay.open .bk-modal{transform:translateY(0)}
+  .bk-slots{grid-template-columns:repeat(3,1fr)}
+}
+
+/* responsive */
+@media(max-width:768px){
+  .nav-links{display:none;position:absolute;top:64px;left:0;width:100%;background:rgba(10,10,15,0.98);flex-direction:column;padding:24px;gap:16px;border-bottom:1px solid var(--border)}
+  .nav-links.open{display:flex}
+  .nav-toggle{display:block}
+  .story-layout{grid-template-columns:1fr;gap:32px}
+  .visit-grid{grid-template-columns:1fr;gap:32px}
+  .craft-grid{grid-template-columns:1fr}
+  .menu-grid{grid-template-columns:1fr}
+  .hero h1{font-size:clamp(2.2rem,10vw,3.2rem)}
+  section{padding:80px 20px}
+  .final-cta{padding:100px 20px}
+}
+</style>
+</head>
+<body>
+
+<div class="atmo"><span class="b1"></span><span class="b2"></span></div>
+
+<!-- nav -->
+<nav id="nav">
+  <div class="nav-inner">
+    <div class="logo">Ember & <em>Oak</em></div>
+    <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#craft">Our Craft</a></li>
+      <li><a href="#menu">Menu</a></li>
+      <li><a href="#story">Story</a></li>
+      <li><a href="#visit">Visit</a></li>
+      <li><a href="#" id="navBook">Book</a></li>
+      <li><a href="#" id="navMyBookings">My bookings</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- hero -->
+<section class="hero luxury-hero" id="hero">
+  <div class="hero-content reveal">
+    <span class="badge">Est. 2024 · Chennai</span>
+    <h1>Slow coffee.<br><span class="gradient">No shortcuts.</span></h1>
+    <p>Single-origin beans, roasted in-house, poured by hand. A seat at Ember & Oak is an invitation to slow down.</p>
+    <div class="cta-group">
+      <a href="#" class="cta cta-primary js-book">Book a table</a>
+      <a href="#menu" class="cta cta-secondary">Explore the Menu</a>
+    </div>
+  </div>
+</section>
+
+<!-- marquee -->
+<div class="marquee-section">
+  <div class="marquee-track">
+    <span>Single-origin beans from Araku Valley</span>
+    <span>Small-batch roasting every Tuesday</span>
+    <span>Pour-over bar open all day</span>
+    <span>Hand-brewed · No automation</span>
+    <span>Chennai's first specialty micro-roastery</span>
+    <span>Single-origin beans from Araku Valley</span>
+    <span>Small-batch roasting every Tuesday</span>
+    <span>Pour-over bar open all day</span>
+    <span>Hand-brewed · No automation</span>
+    <span>Chennai's first specialty micro-roastery</span>
+  </div>
+</div>
+
+<!-- craft -->
+<section id="craft">
+  <div class="section-inner">
+    <div class="reveal"><span class="section-label">Our Craft</span></div>
+    <h2 class="section-title reveal reveal-delay-1">Three pillars.<br>One obsession.</h2>
+    <p class="section-sub reveal reveal-delay-2">We don't believe in shortcuts. Every cup starts with a decision made weeks before the bean reaches our roaster.</p>
+    <div class="craft-grid">
+      <div class="craft-card reveal reveal-delay-1">
+        <span class="craft-icon">🌱</span>
+        <h3>Single-Origin Beans</h3>
+        <p>We source directly from smallholder farms in Araku Valley, Coorg, and Chikmagalur. Each lot is traceable to the estate — you'll know exactly where your coffee slept last night.</p>
+      </div>
+      <div class="craft-card reveal reveal-delay-2">
+        <span class="craft-icon">🔥</span>
+        <h3>Small-Batch Roasting</h3>
+        <p>Every Tuesday, we roast 12 kg batches on a refurbished Probat drum. We profile each bean individually — light for floral Ethiopians, medium for chocolaty South Indians.</p>
+      </div>
+      <div class="craft-card reveal reveal-delay-3">
+        <span class="craft-icon">🫗</span>
+        <h3>Pour-Over Bar</h3>
+        <p>No espresso machines. No automation. Every cup is hand-poured to order — V60, Kalita, or Aeropress. We weigh, bloom, and pour. It takes four minutes. It's worth it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- menu -->
+<section id="menu" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-inner">
+    <div class="reveal"><span class="section-label">The Menu</span></div>
+    <h2 class="section-title reveal reveal-delay-1">Six drinks.<br>No fluff.</h2>
+    <p class="section-sub reveal reveal-delay-2">We rotate our single-origin offerings weekly. These six are our anchors — available every day, made the same way every time.</p>
+    <div class="menu-grid reveal reveal-delay-3">
+      <div class="menu-item">
+        <div class="menu-info">
+          <h4>Pour-Over · Washed Ethiopia</h4>
+          <p>Blueberry, jasmine, silky body. 12g dose, 200ml yield, 3:30 brew time.</p>
+        </div>
+        <span class="menu-price">₹280</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-info">
+          <h4>Pour-Over · Natural Karnataka</h4>
+          <p>Dark chocolate, ripe cherry, full body. A South Indian classic, naturally processed.</p>
+        </div>
+        <span class="menu-price">₹260</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-info">
+          <h4>Cold Brew · 18-Hour</h4>
+          <p>Coarse-ground, steeped cold, double-filtered. Served over a single large ice cube. No dilution.</p>
+        </div>
+        <span class="menu-price">₹240</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-info">
+          <h4>Aeropress · Tonic</h4>
+          <p>Bright Ethiopian pour-over flash-chilled over artisanal tonic water. Lime wheel, no sugar.</p>
+        </div>
+        <span class="menu-price">₹300</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-info">
+          <h4>Filter Coffee · Ember Style</h4>
+          <p>Our take on the South Indian classic. Single-origin decoction, frothed whole milk, a pinch of jaggery.</p>
+        </div>
+        <span class="menu-price">₹200</span>
+      </div>
+      <div class="menu-item">
+        <div class="menu-info">
+          <h4>Sparkling Yerba Mate</h4>
+          <p>Cold-brewed yerba mate, house-made ginger syrup, topped with soda. Zero coffee, all focus.</p>
+        </div>
+        <span class="menu-price">₹220</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- story -->
+<section id="story">
+  <div class="section-inner">
+    <div class="reveal"><span class="section-label">Our Story</span></div>
+    <h2 class="section-title reveal reveal-delay-1">Two friends,<br>one roaster,<br>a city that needed better coffee.</h2>
+    <div class="story-layout">
+      <div class="story-text reveal reveal-delay-2">
+        <p>Arun and Meera met at a cupping lab in Bengaluru in 2019. He was a chemical engineer who'd spent two years building a fluid-bed roaster in his garage. She was a barista who'd left a corporate job to chase the perfect pour-over.</p>
+        <p>They spent the next three years travelling to coffee estates across South India — sleeping on plantation floors, cupping hundreds of lots, learning why the same bean tastes different when grown 200 metres higher.</p>
+        <div class="pull-quote">"We wanted a place where the coffee was the point. Not the Wi-Fi. Not the ambience. Just the cup."</div>
+        <p>Ember & Oak opened in December 2024 in a quiet lane off TTK Road, Chennai. No signboard out front — just the smell of freshly roasted beans drifting onto the street. The roaster sits in the window. The pour-over bar is the centrepiece. There are exactly twelve seats.</p>
+      </div>
+      <div class="story-image reveal reveal-delay-3">
+        <span style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:var(--muted);font-size:0.8rem;opacity:0.5;white-space:nowrap">Arun & Meera · Roastery floor, 2024</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- visit -->
+<section id="visit" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-inner">
+    <div class="reveal"><span class="section-label">Visit Us</span></div>
+    <h2 class="section-title reveal reveal-delay-1">Come as you are.<br>Leave with a reason to return.</h2>
+    <div class="visit-grid">
+      <div class="visit-info reveal reveal-delay-2">
+        <div class="visit-block">
+          <h4>Address</h4>
+          <p>12/3, TTK Road, Alwarpet,<br>Chennai — 600018</p>
+        </div>
+        <div class="visit-block">
+          <h4>Hours</h4>
+          <p>Monday – Saturday · 7:00 AM – 6:00 PM<br>Sunday · 8:00 AM – 4:00 PM</p>
+        </div>
+        <div class="visit-block">
+          <h4>Contact</h4>
+          <p>+91 98412 34567<br>hello@emberandoak.in</p>
+        </div>
+        <div class="visit-block">
+          <h4>Good to know</h4>
+          <p>No laptops after 11 AM on weekends.<br>Yes, we take reservations for the pour-over bar.<br>Cash, UPI, cards — all welcome.</p>
+        </div>
+      </div>
+      <div class="visit-map reveal reveal-delay-3">
+        <span class="map-pin">📍</span>
+        <span class="map-label">Ember & Oak</span>
+        <span>12/3 TTK Road, Alwarpet</span>
+        <span style="font-size:0.78rem;opacity:0.5;margin-top:8px">Map placeholder · Chennai</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- final cta -->
+<section class="final-cta" id="book">
+  <div class="reveal">
+    <h2>Find your seat.</h2>
+    <p>Twelve seats. One pour-over bar. A city that's finally waking up to real coffee. Reserve your spot — walk-ins welcome, but the best seats go to those who book.</p>
+    <a href="#" class="cta cta-primary js-book">Book a table →</a>
+  </div>
+</section>
+
+<!-- footer -->
+<footer>
+  <div class="footer-inner">
+    <div class="logo">Ember & <em>Oak</em></div>
+    <div class="footer-links">
+      <a href="#">Instagram</a>
+      <a href="#">Twitter</a>
+      <a href="#">hello@emberandoak.in</a>
+    </div>
+    <div class="footer-copy">© 2024 Ember & Oak · Alwarpet, Chennai</div>
+  </div>
+</footer>
+
+<!-- booking modal -->
+<div class="bk-overlay" id="bkOverlay" role="dialog" aria-modal="true" aria-label="Book a table">
+  <div class="bk-modal" id="bkModal">
+    <div class="bk-head">
+      <h3 id="bkTitle">Book a table</h3>
+      <button class="bk-close" id="bkClose" aria-label="Close">✕</button>
+    </div>
+    <div class="bk-steps" id="bkSteps"><span class="on"></span><span></span></div>
+    <div id="bkBody"></div>
+  </div>
+</div>
+
+<script>
+// nav scroll effect
+const nav = document.getElementById('nav');
+window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>40)});
+
+// mobile nav toggle
+document.getElementById('navToggle').addEventListener('click',()=>{
+  document.getElementById('navLinks').classList.toggle('open');
+});
+
+// scroll reveal
+const observer = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});
+},{threshold:0.12});
+
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// close mobile nav on link click
+document.querySelectorAll('.nav-links a').forEach(a=>{
+  a.addEventListener('click',()=>document.getElementById('navLinks').classList.remove('open'));
+});
+
+/* ══════════ BOOKING SYSTEM ══════════ */
+(function(){
+'use strict';
+const overlay=document.getElementById('bkOverlay'),modal=document.getElementById('bkModal'),
+      body=document.getElementById('bkBody'),title=document.getElementById('bkTitle'),
+      steps=document.getElementById('bkSteps'),closeBtn=document.getElementById('bkClose');
+const LS='ember.bookings';
+const load=()=>{try{return JSON.parse(localStorage.getItem(LS))||[]}catch{return[]}};
+const save=(b)=>localStorage.setItem(LS,JSON.stringify(b));
+let draft={name:'',phone:'',email:'',date:'',time:'',party:2,notes:''};
+let lastFocus=null,view='form';
+
+/* ── open / close ── */
+function open(v){
+  view=v; lastFocus=document.activeElement;
+  render();
+  overlay.classList.add('open');
+  document.body.classList.add('bk-lock');
+  setTimeout(()=>{const f=modal.querySelector('input,button:not(.bk-close)');f&&f.focus()},80);
+}
+function close(){
+  overlay.classList.remove('open');
+  document.body.classList.remove('bk-lock');
+  lastFocus&&lastFocus.focus();
+}
+closeBtn.addEventListener('click',close);
+overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+document.addEventListener('keydown',e=>{
+  if(!overlay.classList.contains('open'))return;
+  if(e.key==='Escape')close();
+  if(e.key==='Tab'){ /* focus trap */
+    const els=[...modal.querySelectorAll('button:not(:disabled),input,textarea,[tabindex]')].filter(x=>x.offsetParent);
+    if(!els.length)return;
+    const first=els[0],last=els[els.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+  }
+});
+document.querySelectorAll('.js-book').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();open('form')}));
+document.getElementById('navBook').addEventListener('click',e=>{e.preventDefault();open('form')});
+document.getElementById('navMyBookings').addEventListener('click',e=>{e.preventDefault();open('list')});
+
+/* ── helpers ── */
+const pad=n=>String(n).padStart(2,'0');
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const maxStr=()=>{const d=new Date(Date.now()+30*864e5);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+function slots(){
+  const out=[];for(let h=8;h<22;h++){out.push(pad(h)+':00');if(h<21||true)out.push(pad(h)+':30')}
+  return out.filter(t=>t<='21:30');
+}
+const fmtTime=t=>{let[h,m]=t.split(':').map(Number);const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+pad(m)+' '+ap};
+const fmtDate=d=>new Date(d+'T00:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const validators={
+  name:v=>v.trim().length>=2||'Please enter your name',
+  phone:v=>/^[0-9]{10}$/.test(v.replace(/\D/g,''))||'Enter a valid 10-digit phone number',
+  email:v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)||'Enter a valid email address',
+  date:v=>(v>=todayStr()&&v<=maxStr())||'Pick a date within the next 30 days',
+  time:v=>!!v||'Pick a time slot'
+};
+function stepOk(){
+  return Object.keys(validators).every(k=>validators[k](draft[k]||'')===true);
+}
+
+/* ── render ── */
+function render(){
+  steps.style.display=view==='form'||view==='review'?'flex':'none';
+  steps.children[0].classList.toggle('on',true);
+  steps.children[1].classList.toggle('on',view==='review');
+  if(view==='form'){title.textContent='Book a table';renderForm()}
+  else if(view==='review'){title.textContent='Review booking';renderReview()}
+  else if(view==='success'){title.textContent='Confirmed';}
+  else{title.textContent='My bookings';renderList()}
+}
+
+function field(k,label,input){
+  return '<div class="bk-field" data-k="'+k+'"><label>'+label+'</label>'+input+'<div class="bk-err"></div></div>';
+}
+function renderForm(){
+  body.innerHTML=
+    field('name','Name','<input id="f-name" type="text" autocomplete="name" value="'+esc(draft.name)+'" placeholder="Your name">')+
+    '<div class="bk-row">'+
+    field('phone','Phone','<input id="f-phone" type="tel" inputmode="numeric" autocomplete="tel" value="'+esc(draft.phone)+'" placeholder="98765 43210">')+
+    field('email','Email','<input id="f-email" type="email" autocomplete="email" value="'+esc(draft.email)+'" placeholder="you@email.com">')+
+    '</div>'+
+    field('date','Date','<input id="f-date" type="date" min="'+todayStr()+'" max="'+maxStr()+'" value="'+draft.date+'">')+
+    field('time','Time','<div class="bk-slots" id="f-slots"></div>')+
+    field('party','Party size','<div class="bk-stepper"><button type="button" id="f-minus" aria-label="fewer">−</button><b id="f-party">'+draft.party+(draft.party===1?' guest':' guests')+'</b><button type="button" id="f-plus" aria-label="more">+</button></div>')+
+    field('notes','Special requests <span style="text-transform:none;letter-spacing:0">(optional)</span>','<textarea id="f-notes" rows="2" maxlength="200" placeholder="Allergies, occasions, window seat…">'+esc(draft.notes)+'</textarea><div class="bk-count"><span id="f-count">'+draft.notes.length+'</span>/200</div>')+
+    '<div class="bk-actions"><button class="bk-btn" id="f-cancel">Cancel</button><button class="bk-btn primary" id="f-next">Continue →</button></div>';
+
+  paintSlots();
+  const bind=(k,id)=>{
+    const el=document.getElementById(id);
+    el.addEventListener('input',()=>{draft[k]=el.value;clearErr(k);if(k==='date')paintSlots();if(k==='notes')document.getElementById('f-count').textContent=el.value.length;syncNext()});
+    el.addEventListener('blur',()=>showErr(k));
+  };
+  bind('name','f-name');bind('phone','f-phone');bind('email','f-email');bind('date','f-date');bind('notes','f-notes');
+  document.getElementById('f-minus').addEventListener('click',()=>{draft.party=Math.max(1,draft.party-1);refreshParty()});
+  document.getElementById('f-plus').addEventListener('click',()=>{draft.party=Math.min(8,draft.party+1);refreshParty()});
+  document.getElementById('f-cancel').addEventListener('click',close);
+  document.getElementById('f-next').addEventListener('click',()=>{
+    let bad=false;
+    Object.keys(validators).forEach(k=>{if(showErr(k))bad=true});
+    if(bad){modal.classList.remove('bk-shake');void modal.offsetWidth;modal.classList.add('bk-shake');return}
+    view='review';render();
+  });
+  body.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();document.getElementById('f-next').click()}});
+  syncNext();
+}
+function refreshParty(){document.getElementById('f-party').textContent=draft.party+(draft.party===1?' guest':' guests')}
+function paintSlots(){
+  const wrap=document.getElementById('f-slots');if(!wrap)return;
+  const now=new Date(),isToday=draft.date===todayStr();
+  wrap.innerHTML=slots().map(t=>{
+    const past=isToday&&(t<=pad(now.getHours())+':'+pad(now.getMinutes()));
+    return '<button type="button" data-t="'+t+'" '+(past?'disabled':'')+(t===draft.time?' class="sel"':'')+'>'+fmtTime(t)+'</button>';
+  }).join('');
+  wrap.querySelectorAll('button:not(:disabled)').forEach(b=>b.addEventListener('click',()=>{
+    draft.time=b.dataset.t;wrap.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');clearErr('time');syncNext();
+  }));
+}
+function showErr(k){
+  const v=validators[k]?validators[k](draft[k]||''):true;
+  const f=body.querySelector('[data-k="'+k+'"]');if(!f)return false;
+  if(v!==true){f.classList.add('invalid');f.querySelector('.bk-err').textContent=v;return true}
+  f.classList.remove('invalid');return false;
+}
+function clearErr(k){const f=body.querySelector('[data-k="'+k+'"]');f&&f.classList.remove('invalid')}
+function syncNext(){const n=document.getElementById('f-next');n&&(n.disabled=!stepOk())}
+
+function renderReview(){
+  body.innerHTML=
+    '<div class="bk-review">'+
+    '<div><span>Name</span><b>'+esc(draft.name)+'</b></div>'+
+    '<div><span>Phone</span><b>'+esc(draft.phone)+'</b></div>'+
+    '<div><span>Email</span><b>'+esc(draft.email)+'</b></div>'+
+    '<div><span>Date</span><b>'+fmtDate(draft.date)+'</b></div>'+
+    '<div><span>Time</span><b>'+fmtTime(draft.time)+'</b></div>'+
+    '<div><span>Party</span><b>'+draft.party+(draft.party===1?' guest':' guests')+'</b></div>'+
+    (draft.notes?'<div><span>Requests</span><b>'+esc(draft.notes)+'</b></div>':'')+
+    '</div>'+
+    '<button class="bk-edit" id="r-edit">← Edit details</button>'+
+    '<div class="bk-actions"><button class="bk-btn primary" id="r-confirm">Confirm booking</button></div>';
+  document.getElementById('r-edit').addEventListener('click',()=>{view='form';render()});
+  document.getElementById('r-confirm').addEventListener('click',confirmBooking);
+}
+
+function makeRef(){
+  const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let r='';
+  for(let i=0;i<5;i++)r+=chars[Math.floor(Math.random()*chars.length)];
+  return 'EO-'+r;
+}
+function confirmBooking(){
+  const bk={...draft,ref:makeRef(),created:Date.now()};
+  save([bk,...load()]);
+  view='success';render();
+  body.innerHTML=
+    '<div class="bk-success">'+
+    '<svg class="bk-check" viewBox="0 0 72 72"><circle cx="36" cy="36" r="34"/><path d="M22 37 l10 10 l18 -20"/></svg>'+
+    '<div class="bk-ref">'+bk.ref+'</div>'+
+    '<div class="bk-sub">'+fmtDate(bk.date)+' · '+fmtTime(bk.time)+' · '+bk.party+(bk.party===1?' guest':' guests')+'</div>'+
+    '<div class="bk-actions" style="flex-direction:column">'+
+    '<button class="bk-btn" id="s-ics">Add to calendar (.ics)</button>'+
+    '<button class="bk-btn" id="s-mail">Email confirmation</button>'+
+    '<button class="bk-btn primary" id="s-done">Done</button>'+
+    '</div></div>';
+  document.getElementById('s-ics').addEventListener('click',()=>downloadIcs(bk));
+  document.getElementById('s-mail').addEventListener('click',()=>mailto(bk));
+  document.getElementById('s-done').addEventListener('click',()=>{draft={name:'',phone:'',email:'',date:'',time:'',party:2,notes:''};close()});
+}
+
+function downloadIcs(bk){
+  const dt=bk.date.replace(/-/g,'')+'T'+bk.time.replace(':','')+'00';
+  const end=new Date(bk.date+'T'+bk.time);end.setMinutes(end.getMinutes()+90);
+  const dtEnd=end.getFullYear()+pad(end.getMonth()+1)+pad(end.getDate())+'T'+pad(end.getHours())+pad(end.getMinutes())+'00';
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Ember & Oak//Booking//EN','BEGIN:VEVENT',
+    'UID:'+bk.ref+'@emberandoak.in','DTSTART:'+dt,'DTEND:'+dtEnd,
+    'SUMMARY:Table at Ember & Oak ('+bk.ref+')',
+    'DESCRIPTION:Party of '+bk.party+'. '+(bk.notes||''),
+    'LOCATION:Ember & Oak\\, 12/3 TTK Road\\, Alwarpet\\, Chennai',
+    'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));
+  a.download='ember-oak-'+bk.ref+'.ics';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function mailto(bk){
+  const sub='Your table at Ember & Oak — '+bk.ref;
+  const bodyTxt='Hi '+bk.name+',\n\nYour reservation is confirmed.\n\nReference: '+bk.ref+'\nDate: '+fmtDate(bk.date)+'\nTime: '+fmtTime(bk.time)+'\nParty: '+bk.party+'\n'+(bk.notes?'Requests: '+bk.notes+'\n':'')+'\nEmber & Oak · 12/3 TTK Road, Alwarpet, Chennai\n+91 98412 34567 · hello@emberandoak.in\n\nSee you soon — the kettle will be ready.';
+  location.href='mailto:'+encodeURIComponent(bk.email)+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(bodyTxt);
+}
+
+function renderList(){
+  const items=load();
+  if(!items.length){body.innerHTML='<div class="bk-empty">No reservations yet — the kettle is waiting.</div>';return}
+  body.innerHTML='<div class="bk-list">'+items.map(b=>
+    '<div class="bk-card"><div class="meta"><b>'+b.ref+'</b><p>'+fmtDate(b.date)+' · '+fmtTime(b.time)+' · '+b.party+(b.party===1?' guest':' guests')+'</p></div>'+
+    '<button class="bk-cancel" data-ref="'+b.ref+'">Cancel</button></div>').join('')+'</div>';
+  body.querySelectorAll('.bk-cancel').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!btn.classList.contains('arm')){btn.classList.add('arm');btn.textContent='Are you sure?';
+      setTimeout(()=>{btn.classList.remove('arm');btn.textContent='Cancel'},2500);return}
+    save(load().filter(b=>b.ref!==btn.dataset.ref));renderList();
+  }));
+}
+})();
+</script>
+
+</body>
+</html>
