@@ -14,14 +14,14 @@ Built by a 13-year-old founder with Claude Code, on a $0 budget. Runs great on f
 
 **Windows**
 ```bash
-git clone https://github.com/Dynamox-DEV677/KODA--your-claude-alternative.git koda
+git clone https://github.com/Dynamox-DEV677/koda.git
 cd koda
 .\koda.bat
 ```
 
 **macOS / Linux**
 ```bash
-git clone https://github.com/Dynamox-DEV677/KODA--your-claude-alternative.git koda
+git clone https://github.com/Dynamox-DEV677/koda.git
 cd koda
 node src/index.js
 ```
@@ -50,6 +50,13 @@ Build mode plans the file structure, writes every file through tools (chat is ju
 koda /build "a pomodoro timer with a premium dark UI"
 ```
 
+## Multimodal
+
+- **Vision** — `/see screenshot.png is the spacing off?` sends the image to a vision model. Reads charts, handwriting (OCR), diagrams, reviews UI. Also available to the agent as the `analyze_image` tool during builds.
+- **Image generation** — `/img a dark SaaS dashboard hero illustration` generates and saves an image. Free, no API key.
+- **Knowledge base / RAG** — `/learn ./my-repo` or `/learn paper.pdf` indexes code, markdown, text and **PDFs** into a local searchable base; `/kb <query>` searches it, and the agent can call `search_knowledge` mid-task. PDF text extraction is built in with zero dependencies (`node:zlib`).
+- **Media agents** — vision, image, video (storyboards, shot lists, beat sheets) and audio (VO scripts with word counts and timing) join the coding agents, auto-selected by intent.
+
 ## What's inside
 
 - **Model router** — messages are classified (coding / frontend / reasoning / research / fast) and routed to the best model per job. Change routes live: `/route coding <model-id>`. `/models` lists what's available.
@@ -68,6 +75,11 @@ koda /build "a pomodoro timer with a premium dark UI"
 | Command | What it does |
 |---|---|
 | `/build <description>` | build mode: whole projects end-to-end |
+| `/see <img> [question]` | look at an image (vision) |
+| `/img <prompt>` | generate an image |
+| `/learn <path>` · `/kb [query]` | index / search the knowledge base |
+| `/prompts` · `/prompt save <name> <text>` | prompt library |
+| `/find <text>` | search the conversation |
 | `/tools on\|off` · `/auto on\|off` | tool calling · auto-approve writes in cwd |
 | `/agents` · `/agent <name\|auto>` | list / force a specialist agent |
 | `/models [filter]` · `/model <id\|auto>` | list live models / pin one |

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exec } from 'node:child_process';
 import * as ui from './ui.js';
+import { Knowledge } from './knowledge.js';
 
 /**
  * Tool system. Each tool = one OpenAI-style function definition + one handler.
@@ -90,6 +91,58 @@ export const TOOL_DEFS = [
       parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'analyze_image',
+      description: 'Look at an image file (screenshot, photo, diagram, chart, render, scanned page) and answer a question about it. Use for UI review, OCR, reading charts/handwriting, or describing visuals.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to a .png/.jpg/.webp image' },
+          question: { type: 'string', description: 'What to find out about the image' },
+        },
+        required: ['path', 'question'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_image',
+      description: 'Generate an image from a text prompt (free, no API key) and save it to disk. Use for concept art, logos, thumbnails, textures, posters, placeholder assets.',
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'Detailed visual description — style, subject, lighting, composition' },
+          path: { type: 'string', description: 'Where to save, e.g. ./out/logo.jpg' },
+          width: { type: 'number', description: 'default 1024' },
+          height: { type: 'number', description: 'default 1024' },
+        },
+        required: ['prompt', 'path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'index_knowledge',
+      description: 'Read a folder, repo, or file (code, markdown, text, PDF) into the local knowledge base so it can be searched later. Use before answering questions about a codebase or document set.',
+      parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_knowledge',
+      description: 'Search the indexed knowledge base and return the most relevant excerpts with their source files. Use this instead of guessing about indexed docs or code.',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string' }, k: { type: 'number', description: 'how many excerpts, default 5' } },
+        required: ['query'],
+      },
+    },
+  },
 ];
 
 const runShell = (cmd) => new Promise((resolve) => {
@@ -113,9 +166,47 @@ function* walk(dir, depth = 0) {
   }
 }
 
-export async function executeTool(name, args, { confirm, auto }) {
+const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
+
+export async function executeTool(name, args, { confirm, auto, vision }) {
   try {
     switch (name) {
+      case 'analyze_image': {
+        const p = path.resolve(args.path);
+        if (!fs.existsSync(p)) return `ERROR: no image at ${p}`;
+        const mime = MIME[path.extname(p).toLowerCase()];
+        if (!mime) return 'ERROR: unsupported image type (use png/jpg/webp/gif)';
+        const bytes = fs.statSync(p).size;
+        if (bytes > 12_000_000) return 'ERROR: image over 12MB — resize it first';
+        if (typeof vision !== 'function') return 'ERROR: vision model not available in this context';
+        const b64 = fs.readFileSync(p).toString('base64');
+        return await vision(args.question || 'Describe this image in detail.', `data:${mime};base64,${b64}`);
+      }
+      case 'generate_image': {
+        const p = path.resolve(args.path);
+        const w = Math.min(1536, Math.max(256, args.width || 1024));
+        const h = Math.min(1536, Math.max(256, args.height || 1024));
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(args.prompt)}`
+          + `?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random() * 1e6)}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(180000) });
+        if (!res.ok) return `ERROR: image service ${res.status}`;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length < 1000) return 'ERROR: image service returned an empty image';
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, buf);
+        return `OK: generated ${w}x${h} image (${Math.round(buf.length / 1024)}KB) at ${p}`;
+      }
+      case 'index_knowledge': {
+        const kb = new Knowledge();
+        const r = kb.index(args.path);
+        return `OK: indexed ${r.files} file(s) into ${r.chunks} chunks (skipped ${r.skipped}). Total: ${JSON.stringify(kb.stats())}`;
+      }
+      case 'search_knowledge': {
+        const kb = new Knowledge();
+        const hits = kb.search(args.query, Math.min(10, args.k || 5));
+        if (!hits.length) return '(no matches — index a folder first with index_knowledge)';
+        return hits.map((h) => `--- ${h.file} [part ${h.part}]\n${h.text.slice(0, 1200)}`).join('\n\n');
+      }
       case 'read_file': {
         const p = path.resolve(args.path);
         return fs.readFileSync(p, 'utf8').slice(0, 30000);

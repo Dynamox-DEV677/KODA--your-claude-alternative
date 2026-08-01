@@ -5,6 +5,10 @@
  */
 
 const RULES = [
+  ['vision',    /\b(screenshot|this image|that image|look at (the )?(image|photo|picture|screen)|ocr|read (the )?(text|chart|graph|handwriting)|analy[sz]e (this |the )?(image|photo|screenshot|ui|diagram)|\.png\b|\.jpg\b|\.jpeg\b)/i],
+  ['image',    /\b(generate|create|make|draw|design)\b[^.]{0,40}\b(image|picture|logo|thumbnail|poster|artwork|concept art|illustration|wallpaper|texture|banner)\b/i],
+  ['video',    /\b(storyboard|shot list|scene breakdown|camera move|animation plan|video script|b-roll)\b/i],
+  ['audio',    /\b(voice ?over|voiceover|vo script|podcast|narration|tts|text[- ]to[- ]speech|speech[- ]to[- ]text)\b/i],
   ['frontend',  /\b(website|landing\s*page|web\s*page|ui|ux|css|tailwind|component|dashboard|portfolio|animation|responsive|dark\s*mode|glassmorphism)\b/i],
   ['coding',    /\b(code|coding|bug|debug|error|function|refactor|test|script|regex|compile|python|typescript|javascript|react|node|rust|go(lang)?|java|sql|api|docker|git)\b/i],
   ['reasoning', /\b(math|prove|proof|logic|calculate|solve|equation|puzzle|step[\s-]*by[\s-]*step|architecture\s+decision)\b/i],

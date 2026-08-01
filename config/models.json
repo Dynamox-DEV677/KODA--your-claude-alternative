@@ -1,4 +1,4 @@
-{
+﻿{
   "provider": "nvidia",
   "providers": {
     "nvidia":     { "baseUrl": "https://integrate.api.nvidia.com/v1", "envKey": "NVIDIA_API_KEY" },
@@ -13,7 +13,8 @@
     "fast":      "meta/llama-3.1-8b-instruct",
     "coding":    "deepseek-ai/deepseek-v4-flash",
     "reasoning": "nvidia/nemotron-3-nano-30b-a3b",
-    "review":    "deepseek-ai/deepseek-v4-flash"
+    "review":    "deepseek-ai/deepseek-v4-flash",
+    "vision":    "meta/llama-3.2-90b-vision-instruct"
   },
   "fallbacks": ["nvidia/nemotron-3-nano-30b-a3b", "meta/llama-3.1-8b-instruct"],
   "persona": "",

@@ -1,6 +1,6 @@
 ---
 name: kairo-stack
-description: EXAMPLE of a project-specific skill — rules for one real production stack
+description: Hard-won engineering rules for Darshan's Kairo/Kyno stack
 triggers: kairo, kyno, vercel, supabase, groq, capacitor, dashboard
 ---
 Rules learned from real production incidents on this stack (React+Vite / Express on Vercel / Supabase / Groq). Follow them — each one cost hours to learn.

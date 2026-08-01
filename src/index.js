@@ -82,6 +82,12 @@ ${ui.c.bold}Koda commands${ui.c.reset}
   /build <description>  BUILD MODE: builder agent + tools + auto-writes,
                         creates whole projects end-to-end in the cwd
   /help                 this help
+  /see <img> [q]        look at an image (screenshot, chart, handwriting, UI)
+  /img <prompt>         generate an image (free, no key)
+  /learn <path>         index a folder/repo/PDF into the knowledge base
+  /kb [query|clear]     search or inspect the knowledge base
+  /prompts              list saved prompts   (/prompt save <name> <text>)
+  /find <text>          search this conversation
   /agents               list agents
   /agent <name|auto>    force an agent (auto = route by intent)
   /model <id|auto>      pin a model (auto = use router)
@@ -162,6 +168,115 @@ async function handleSlash(line) {
       session.auto = arg !== 'off';
       ui.note(`auto-write: ${session.auto ? 'on (file writes inside cwd skip y/N; shell still asks)' : 'off'}`);
       break;
+
+    case 'see': {                       // /see <image path> [question]
+      // Call the vision tool directly — routing a path with spaces through the
+      // model's tool call mangles it, and this is cheaper anyway.
+      let m = arg.match(/^"([^"]+)"\s*([\s\S]*)$/);
+      if (!m) {
+        // unquoted: take the longest leading substring that is an existing file
+        const parts = arg.split(/\s+/);
+        for (let i = parts.length; i > 0; i--) {
+          const cand = parts.slice(0, i).join(' ');
+          if (fs.existsSync(path.resolve(cand))) { m = [null, cand, parts.slice(i).join(' ')]; break; }
+        }
+      }
+      if (!m) { ui.error('usage: /see <image path> [question]   (quote paths with spaces)'); break; }
+      const { executeTool } = await import('./tools.js');
+      const spin = ui.spinner('looking at the image');
+      try {
+        const out = await executeTool('analyze_image',
+          { path: m[1], question: m[2] || 'Describe this image in detail.' },
+          { confirm, auto: session.auto, vision: (q, d) => orch.vision(q, d) });
+        spin.stop();
+        ui.print(ui.renderMarkdown(out));
+        session.history.push({ role: 'user', content: `[looked at ${m[1]}] ${m[2] || ''}` }, { role: 'assistant', content: out });
+      } catch (e) { spin.stop(); ui.error(e.message); }
+      break;
+    }
+
+    case 'img': {                       // /img <prompt>
+      if (!arg) { ui.error('usage: /img <what to generate>'); break; }
+      session.tools = true;
+      session.auto = true;
+      await orch.respond(
+        `Generate an image with generate_image. Subject: ${arg}. Save it in the current folder with a short descriptive filename.`,
+        session, { confirm },
+      );
+      break;
+    }
+
+    case 'learn': {                     // /learn <folder|file>  -> index into KB
+      if (!arg) { ui.error('usage: /learn <folder or file>'); break; }
+      const { Knowledge } = await import('./knowledge.js');
+      const spin = ui.spinner(`indexing ${arg}`);
+      try {
+        const r = new Knowledge().index(arg);
+        spin.stop();
+        ui.note(`✓ indexed ${r.files} file(s) → ${r.chunks} chunks (skipped ${r.skipped})`);
+      } catch (e) { spin.stop(); ui.error(e.message); }
+      break;
+    }
+
+    case 'kb': {                        // /kb  or  /kb <query>
+      const { Knowledge } = await import('./knowledge.js');
+      const kb = new Knowledge();
+      if (!arg) {
+        const s = kb.stats();
+        ui.note(`knowledge base: ${s.files} file(s), ${s.chunks} chunks  ${ui.c.gray}(/learn <path> to add, /kb clear to wipe)${ui.c.reset}`);
+        break;
+      }
+      if (arg === 'clear') { kb.clear(); ui.note('knowledge base cleared'); break; }
+      const hits = kb.search(arg, 5);
+      if (!hits.length) { ui.note('no matches'); break; }
+      for (const h of hits) {
+        console.log(`${ui.c.cyan}${h.file}${ui.c.gray} [${h.part}]${ui.c.reset}\n  ${h.text.slice(0, 220).replace(/\s+/g, ' ')}…`);
+      }
+      break;
+    }
+
+    case 'prompts': case 'prompt': {    // saved prompt library
+      const P = path.join(DATA_DIR, 'prompts.json');
+      const load = () => { try { return JSON.parse(fs.readFileSync(P, 'utf8')); } catch { return {}; } };
+      const lib = load();
+      if (cmd.toLowerCase() === 'prompts' && !arg) {
+        const keys = Object.keys(lib);
+        if (!keys.length) { ui.note('no saved prompts — /prompt save <name> <text>'); break; }
+        for (const k of keys) console.log(`  ${ui.c.cyan}${k.padEnd(14)}${ui.c.reset}${lib[k].slice(0, 90)}`);
+        break;
+      }
+      const [sub, name, ...rest] = arg.split(/\s+/);
+      if (sub === 'save') {
+        if (!name || !rest.length) { ui.error('usage: /prompt save <name> <prompt text>'); break; }
+        lib[name] = rest.join(' ');
+        fs.writeFileSync(P, JSON.stringify(lib, null, 2), 'utf8');
+        ui.note(`✓ saved prompt "${name}"`);
+      } else if (sub === 'del') {
+        delete lib[name];
+        fs.writeFileSync(P, JSON.stringify(lib, null, 2), 'utf8');
+        ui.note(`✓ deleted "${name}"`);
+      } else if (lib[sub]) {
+        await orch.respond(lib[sub] + (arg.slice(sub.length).trim() ? ' ' + arg.slice(sub.length).trim() : ''), session, { confirm });
+      } else {
+        ui.error(`unknown prompt "${sub}" — /prompts to list`);
+      }
+      break;
+    }
+
+    case 'find': {                      // search this session's history
+      if (!arg) { ui.error('usage: /find <text>'); break; }
+      const q = arg.toLowerCase();
+      const hits = session.history
+        .map((m, i) => ({ m, i }))
+        .filter(({ m }) => (m.content || '').toLowerCase().includes(q));
+      if (!hits.length) { ui.note('no matches in this session'); break; }
+      for (const { m, i } of hits.slice(-8)) {
+        const idx = (m.content || '').toLowerCase().indexOf(q);
+        const snip = (m.content || '').slice(Math.max(0, idx - 60), idx + 120).replace(/\s+/g, ' ');
+        console.log(`  ${ui.c.gray}[${i}] ${m.role}:${ui.c.reset} …${snip}…`);
+      }
+      break;
+    }
 
     case 'agents':
       for (const [name, a] of Object.entries(AGENTS)) {

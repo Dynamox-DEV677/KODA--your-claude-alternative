@@ -50,6 +50,23 @@ export class Orchestrator {
     throw lastErr;
   }
 
+  /** Sends an image to the vision model. Used by analyze_image and /see. */
+  async vision(question, dataUrl) {
+    const res = await this.#chat({
+      model: resolveModel(this.cfg, 'vision'),
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: question },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ],
+      }],
+      temperature: 0.2,
+      maxTokens: 1500,
+    });
+    return stripThink(res.content) || '(vision model returned nothing)';
+  }
+
   #projectContext(withTree = false) {
     const lines = [`Environment: ${os.platform()} · cwd ${process.cwd()} · date ${new Date().toISOString().slice(0, 10)}`];
     if (this.cfg.persona) lines.push(this.cfg.persona);
@@ -265,7 +282,9 @@ export class Orchestrator {
             onWrite,
           });
         } else {
-          result = await executeTool(tc.function.name, args, { confirm, auto });
+          result = await executeTool(tc.function.name, args, {
+            confirm, auto, vision: (q, d) => this.vision(q, d),
+          });
           if (['write_file', 'append_file', 'edit_file'].includes(tc.function.name) && String(result).startsWith('OK')) {
             onWrite(path.resolve(args.path));
           }
